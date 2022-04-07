@@ -12,20 +12,21 @@ classes = [0, 1, 2, 3]
 batch_size_train = 16
 epochs = 20
 models = {1: create_model_1}
+validation_split = 0.1
 
 
 def create_datasets(data_dir: Path, batch_size: int):
     seed = 1
     train_ds = image_dataset_from_directory(
         data_dir,
-        validation_split=0.2,
+        validation_split=validation_split,
         subset="training",
         seed=seed,
         image_size=(img_height, img_width),
         batch_size=batch_size)
     val_ds = image_dataset_from_directory(
         data_dir,
-        validation_split=0.2,
+        validation_split=validation_split,
         subset="validation",
         seed=seed,
         image_size=(img_height, img_width),

@@ -4,7 +4,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 
 
-def create_model_1(img_height: int, img_width: int, classes: list):
+def create_model_1(img_height: int, img_width: int, classes: list, metrics: list[keras.metrics.Metric]):
     data_augmentation = keras.Sequential(
         [
             layers.RandomFlip("horizontal",
@@ -31,5 +31,5 @@ def create_model_1(img_height: int, img_width: int, classes: list):
     ])
     model.compile(optimizer='adam',
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=["accuracy"])
+                  metrics=metrics)
     return model

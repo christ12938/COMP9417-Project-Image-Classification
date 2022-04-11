@@ -4,7 +4,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 
 
-def create_model_1(img_height: int, img_width: int, classes: list, metrics: list[keras.metrics.Metric]):
+def create_model_1(img_height: int, img_width: int, classes: list, metrics: list[keras.metrics.Metric | str]):
     data_augmentation = keras.Sequential(
         [
             layers.RandomFlip("horizontal",

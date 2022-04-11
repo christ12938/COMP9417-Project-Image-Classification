@@ -12,7 +12,7 @@ img_height = 1024
 img_width = 1024
 classes = [0, 1, 2, 3]
 batch_size = 16
-epochs = 50
+epochs = 30
 models = {1: create_model_1}
 validation_split = 0.2
 
@@ -81,7 +81,7 @@ def predict_model(model, data_dir: Path):
     probability_model = tf.keras.Sequential([model,
                                              tf.keras.layers.Softmax()])
     img_paths = dict((int(i.stem), i) for i in data_dir.glob("*.png"))
-    predictions = np.empty(len(img_paths))
+    predictions = np.full(max(img_paths.keys()) + 1, -1)
 
     for idx, img_path in img_paths.items():
         img_array = tf.expand_dims(img_to_array(load_img(img_path)), 0)
@@ -95,23 +95,14 @@ def plot_training_history(hist, metric_name):
     metric = hist.history[metric_name]
     val_metric = hist.history["val_" + metric_name]
 
-    loss = hist.history['loss']
-    val_loss = hist.history['val_loss']
-
     epochs_range = range(epochs)
 
     plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
     plt.plot(epochs_range, metric, label='Training ' + metric_name)
     plt.plot(epochs_range, val_metric, label='Validation ' + metric_name)
-    plt.legend(loc='lower right')
+    plt.legend(loc='upper left')
     plt.title('Training and Validation ' + metric_name)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
     plt.show()
 
 
@@ -129,12 +120,15 @@ if __name__ == "__main__":
     model = None
 
     if create_model_func is not None and args.train is not None:
-        metric_name = "weighted_f1"
-        metric = WeightedF1(name=metric_name)
-        model = create_model_func(img_height, img_width, classes, [metric])
+        metric_f1_name = "weighted_f1"
+        f1 = WeightedF1(name=metric_f1_name)
+        metric_accuracy = "accuracy"
+        model = create_model_func(img_height, img_width, classes, [f1, metric_accuracy])
         train_ds, val_ds = create_datasets(Path(args.train), batch_size)
         history = train_model(model, train_ds, val_ds, epochs)
-        plot_training_history(history, metric_name)
+        plot_training_history(history, metric_f1_name)
+        plot_training_history(history, metric_accuracy)
+        plot_training_history(history, "loss")
 
         if args.save is not None:
             save_dir = Path(args.save)

@@ -7,14 +7,11 @@ from tensorflow.keras.utils import image_dataset_from_directory, img_to_array, l
 from tensorflow_addons.metrics import F1Score
 
 from nn_tensorflow_models import *
+from nn_tensorflow_train import *
 
 img_height = 1024
 img_width = 1024
 classes = [0, 1, 2, 3]
-batch_size = 16
-epochs = 30
-models = {1: create_model_1}
-validation_split = 0.2
 
 
 class WeightedF1(keras.metrics.Metric):
@@ -33,37 +30,27 @@ class WeightedF1(keras.metrics.Metric):
         self.f1score.reset_state()
 
 
-def create_datasets(data_dir: Path, batch_size: int):
-    seed = 1
+def create_datasets(data_dir: Path, validation_split: float, batch_size: int):
     train_ds = image_dataset_from_directory(
         data_dir,
         validation_split=validation_split,
         subset="training",
-        seed=seed,
+        seed=123,
         image_size=(img_height, img_width),
         batch_size=batch_size)
     val_ds = image_dataset_from_directory(
         data_dir,
         validation_split=validation_split,
         subset="validation",
-        seed=seed,
+        seed=123,
         image_size=(img_height, img_width),
         batch_size=batch_size)
 
     # configure prefetch
     AUTOTUNE = tf.data.AUTOTUNE
-    train_ds = train_ds.cache().shuffle(1000, seed=seed).prefetch(buffer_size=AUTOTUNE)
+    train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
     val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
     return train_ds, val_ds
-
-
-def train_model(model, train_dataset, validation_dataset, epochs: int):
-    history = model.fit(
-        train_dataset,
-        validation_data=validation_dataset,
-        epochs=epochs
-    )
-    return history
 
 
 def configure_gpu():
@@ -95,7 +82,7 @@ def plot_training_history(hist, metric_name):
     metric = hist.history[metric_name]
     val_metric = hist.history["val_" + metric_name]
 
-    epochs_range = range(epochs)
+    epochs_range = range(len(metric))
 
     plt.figure(figsize=(8, 8))
     plt.plot(epochs_range, metric, label='Training ' + metric_name)
@@ -113,20 +100,47 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", metavar="model_id", help="choose a model", type=int, default=0)
     parser.add_argument("-s", "--save", metavar="model_dir", help="save trained model to dir")
     parser.add_argument("-l", "--load", metavar="model_dir", help="load pre-trained model from dir")
+    parser.add_argument("-ht", "--hyper_tune", metavar="hpt_dir", help="hyper-parameters tuning dir", default=".")
+    parser.add_argument("-b", "--batch_size", metavar="batch_size", help="number of images in each training batch",
+                        type=int, default=8)
+    parser.add_argument("-e", "--epochs", metavar="epochs", help="number of training epochs",
+                        type=int, default=30)
+    parser.add_argument("-v", "--validation_split", metavar="proportion",
+                        help="proportion of training data reserved for validation",
+                        type=float, default=0.2)
+    parser.add_argument("-r", "--rng_seed", metavar="seed_num",
+                        help="seed used for randomisation",
+                        type=int, default=None)
     args = parser.parse_args()
 
+    if args.rng_seed is not None:
+        tf.random.set_seed(args.rng_seed)
+
     configure_gpu()
-    create_model_func = models.get(args.model)
+    models_and_training = {
+        1: (create_model_1, train_model),
+        2: (create_model_2, lambda *a: tune_and_train_model(*a, tuning_dir=args.hyper_tune, model_id=2)),
+        3: (create_model_3, train_model),
+        4: (create_model_4, train_model)
+    }
+    model_builder, model_trainer = models_and_training.get(args.model, (None, None))
     model = None
 
-    if create_model_func is not None and args.train is not None:
-        metric_f1_name = "weighted_f1"
-        f1 = WeightedF1(name=metric_f1_name)
+    if model_builder is not None \
+            and model_trainer is not None \
+            and args.train is not None:
+        f1 = WeightedF1(name="weighted_f1")
         metric_accuracy = "accuracy"
-        model = create_model_func(img_height, img_width, classes, [f1, metric_accuracy])
-        train_ds, val_ds = create_datasets(Path(args.train), batch_size)
-        history = train_model(model, train_ds, val_ds, epochs)
-        plot_training_history(history, metric_f1_name)
+        train_ds, val_ds = create_datasets(Path(args.train), args.validation_split, args.batch_size)
+        model, history = model_trainer(model_builder,
+                                       img_height,
+                                       img_width,
+                                       classes,
+                                       [f1, metric_accuracy],
+                                       train_ds,
+                                       val_ds,
+                                       args.epochs)
+        plot_training_history(history, f1.name)
         plot_training_history(history, metric_accuracy)
         plot_training_history(history, "loss")
 
@@ -139,6 +153,8 @@ if __name__ == "__main__":
     else:
         print("Must either create and train a new model from dataset or load from saved models")
         exit()
+
+    print(model.summary())
 
     if args.predict is not None:
         predict_model(model, Path(args.predict))

@@ -53,12 +53,4 @@ def tune_and_train_model(model_builder: Callable,
         validation_data=validation_dataset,
         epochs=epochs
     )
-    val_metric_per_epoch = history.history[primary_val_metric]
-    best_epoch = val_metric_per_epoch.index(max(val_metric_per_epoch)) + 1
-    model = tuner.hypermodel.build(best_hps)
-    model.fit(
-        train_dataset,
-        validation_data=validation_dataset,
-        epochs=best_epoch
-    )
     return model, history

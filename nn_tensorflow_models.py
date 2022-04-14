@@ -148,3 +148,35 @@ def create_model_4(img_height: int, img_width: int, classes: list, metrics: list
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                   metrics=metrics)
     return model
+
+
+def create_model_5(img_height: int, img_width: int, classes: list,
+                   metrics: list[keras.metrics.Metric | str]):
+    data_augmentation = keras.Sequential(
+        [
+            layers.RandomFlip(input_shape=(img_height,
+                                           img_width,
+                                           3)),
+            layers.RandomRotation(0.5),
+            layers.RandomZoom((0, -0.1)),
+        ]
+    )
+    model = Sequential([
+        data_augmentation,
+        layers.Rescaling(1. / 255),
+        layers.Conv2D(24, 3, padding='same', activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Conv2D(32, 3, padding='same', activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Conv2D(80, 3, padding='same', activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Dropout(0.1),
+        layers.Flatten(),
+        layers.Dense(96, activation='relu'),
+        layers.Dense(len(classes))
+    ],
+        name="m5_auto_tuned_best")
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  metrics=metrics)
+    return model

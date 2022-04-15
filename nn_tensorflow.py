@@ -123,6 +123,8 @@ if __name__ == "__main__":
         3: (create_model_3, train_model),
         4: (create_model_4, train_model),
         5: (create_model_5, train_model),
+        6: (create_model_6, lambda *a: tune_and_train_model(*a, tuning_dir=args.hyper_tune, model_id=6)),
+        7: (create_model_7, train_model)
     }
     model_builder, model_trainer = models_and_training.get(args.model, (None, None))
     model = None

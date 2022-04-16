@@ -76,6 +76,7 @@ def predict_model(model, data_dir: Path):
         predictions[idx] = classes[np.argmax(pred_prob)]
 
     np.save(str(data_dir / Path("y_test")), predictions)
+    np.savetxt(str(data_dir / Path("y_test.csv")), predictions.T, fmt="%d", delimiter=",")
 
 
 def plot_training_history(hist, metric_name):

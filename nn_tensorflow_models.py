@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.models import Sequential
 
 
@@ -272,6 +273,40 @@ def create_model_7(img_height: int, img_width: int, classes: list,
     ],
         name="m7_best_m6")
     model.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-4),
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  metrics=metrics)
+    return model
+
+
+def create_model_8(img_height: int, img_width: int, classes: list,
+                   metrics: list[keras.metrics.Metric | str]):
+    data_augmentation = keras.Sequential(
+        [
+            layers.RandomFlip(input_shape=(img_height,
+                                           img_width,
+                                           3)),
+            layers.RandomRotation(0.5),
+        ]
+    )
+    model = Sequential([
+        data_augmentation,
+        layers.Rescaling(1. / 255),
+        layers.Conv2D(32, 3, 3, activation=LeakyReLU(alpha=0.01)),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Dropout(0.1),
+        layers.Conv2D(32, 3, 3, activation=LeakyReLU(alpha=0.01)),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Dropout(0.1),
+        layers.Conv2D(64, 3, 3, activation=LeakyReLU(alpha=0.01)),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Dropout(0.1),
+        layers.Flatten(),
+        layers.Dense(64, activation=LeakyReLU(alpha=0.01)),
+        layers.Dropout(0.5),
+        layers.Dense(len(classes))
+    ],
+        name="m8_leaky_relu")
+    model.compile(optimizer="adam",
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                   metrics=metrics)
     return model

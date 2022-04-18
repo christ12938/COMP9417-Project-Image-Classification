@@ -1,23 +1,27 @@
 import argparse
 from pathlib import Path
+from time import time_ns
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.utils import class_weight
 from tensorflow.keras.utils import image_dataset_from_directory, img_to_array, load_img
 from tensorflow_addons.metrics import F1Score
 
+from nn_tensorflow_dataset import *
 from nn_tensorflow_models import *
 from nn_tensorflow_train import *
 
-img_height = 1024
-img_width = 1024
-classes = [0, 1, 2, 3]
+img_height: int = 1024
+img_width: int = 1024
+classes: list[int] = [0, 1, 2, 3]
 
 
 class WeightedF1(keras.metrics.Metric):
-    def __init__(self, name="weighted_f1"):
+    def __init__(self, n_classes: int, name="weighted_f1"):
         super(WeightedF1, self).__init__(name=name)
-        self.f1score = F1Score(num_classes=len(classes), average="weighted")
+        self.f1score = F1Score(num_classes=n_classes, average="weighted")
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.squeeze(tf.one_hot(y_true, self.f1score.num_classes))
@@ -30,27 +34,31 @@ class WeightedF1(keras.metrics.Metric):
         self.f1score.reset_state()
 
 
-def create_datasets(data_dir: Path, validation_split: float, batch_size: int):
+def create_datasets(data_dir: Path, validation_split: float, batch_size: int, seed: Optional[int]) -> Dataset:
+    seed = seed or time_ns() // 1_000_000_000
     train_ds = image_dataset_from_directory(
         data_dir,
         validation_split=validation_split,
         subset="training",
-        seed=123,
+        seed=seed,
         image_size=(img_height, img_width),
         batch_size=batch_size)
     val_ds = image_dataset_from_directory(
         data_dir,
         validation_split=validation_split,
         subset="validation",
-        seed=123,
+        seed=seed,
         image_size=(img_height, img_width),
         batch_size=batch_size)
+
+    y_train = [int(Path(f).parent.name) for f in train_ds.file_paths]
+    class_weights = class_weight.compute_class_weight(class_weight="balanced", classes=classes, y=y_train)
 
     # configure prefetch
     AUTOTUNE = tf.data.AUTOTUNE
     train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
     val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
-    return train_ds, val_ds
+    return Dataset(train_set=train_ds, valid_set=val_ds, class_weights=dict(enumerate(class_weights)))
 
 
 def configure_gpu():
@@ -125,7 +133,8 @@ if __name__ == "__main__":
         4: (create_model_4, train_model),
         5: (create_model_5, train_model),
         6: (create_model_6, lambda *a: tune_and_train_model(*a, tuning_dir=args.hyper_tune, model_id=6)),
-        7: (create_model_7, train_model)
+        7: (create_model_7, train_model),
+        8: (create_model_8, train_model_with_class_weights),
     }
     model_builder, model_trainer = models_and_training.get(args.model, (None, None))
     model = None
@@ -133,16 +142,15 @@ if __name__ == "__main__":
     if model_builder is not None \
             and model_trainer is not None \
             and args.train is not None:
-        f1 = WeightedF1(name="weighted_f1")
+        dataset = create_datasets(Path(args.train), args.validation_split, args.batch_size, args.rng_seed)
+        f1 = WeightedF1(n_classes=len(classes), name="weighted_f1")
         metric_accuracy = "accuracy"
-        train_ds, val_ds = create_datasets(Path(args.train), args.validation_split, args.batch_size)
         model, history = model_trainer(model_builder,
                                        img_height,
                                        img_width,
                                        classes,
                                        [f1, metric_accuracy],
-                                       train_ds,
-                                       val_ds,
+                                       dataset,
                                        args.epochs)
         plot_training_history(history, f1.name)
         plot_training_history(history, metric_accuracy)

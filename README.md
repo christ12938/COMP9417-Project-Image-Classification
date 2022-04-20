@@ -1,6 +1,7 @@
 # comp9417
 modules included in this project:
 1. image_sorter.py - takes the provided .png training images, and combine with their class labels in .npy file, to produce a directory containing the images where each class is in their own subdirectory named accordingly
+2. cleaner.py - deletes png files in a specified directory if they meet a specified percentage of almost white pixels
 2. nn_tensorflow.py - entry point of program for tensorflow neural networks pipeline, train on provided images using specified model, and run prediction on a test directory. see -h or --help for detailed list of arguments
 3. nn_tensorflow_models.py - factory methods for creating models of various structure
 4. nn_tensorflow_train.py - methods for different ways a model may be trained and fitted
